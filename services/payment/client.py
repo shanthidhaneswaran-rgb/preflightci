@@ -18,12 +18,7 @@ def process_payment(transaction_id, amount):
     return fraud_response.status_code, customer_response.status_code
 
 
-import requests
 
 
-def verify_payment(transaction_id):
-    response = requests.post(
-        "https://payment-service.internal/payments",
-        json={"transaction_id": transaction_id},
-    )
-    return response.status_code
+
+
