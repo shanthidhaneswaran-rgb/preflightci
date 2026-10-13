@@ -69,10 +69,61 @@ jobs:
             const complianceFindings =
               report.compliance_findings || [];
             const errors = report.analysis_errors || [];
+            const impact = report.downstream_impact || {};
+            const affectedServices = impact.affected_services || [];
+            const dependencyEdges = impact.dependency_edges || [];
+
+            const impactLines = [];
+
+            if (impact.changed_services && impact.changed_services.length) {
+              impactLines.push(
+                `**Changed services:** ${impact.changed_services.join(', ')}`
+              );
+            }
+
+            if (affectedServices.length) {
+              for (const item of affectedServices) {
+                const consumers = item.affected_consumers || [];
+                impactLines.push(
+                  `- **${item.changed_service}** may affect: ${
+                    consumers.length ? consumers.join(', ') : 'No known consumers'
+                  }`
+                );
+
+                const evidence = item.evidence || [];
+                for (const edge of evidence) {
+                  impactLines.push(
+                    `  - Evidence: \`${edge.method} ${edge.path}\` ` +
+                    `from **${edge.source}** ` +
+                    `(\`${edge.file || 'unknown file'}:${edge.line || '?'}\`)`
+                  );
+                }
+              }
+            } else if (impact.status === 'no_known_consumers') {
+              impactLines.push(
+                'No downstream consumers were identified by the configured static scan.'
+              );
+            } else if (impact.status === 'unknown') {
+              impactLines.push(
+                'Impact could not be determined. Review the service map and analysis errors.'
+              );
+            } else {
+              impactLines.push(
+                'No affected consumers were reported for this change.'
+              );
+            }
+
+            impactLines.push(
+              `**Analysis status:** ${impact.status || 'unknown'}`
+            );
+
+            if (impact.reason) {
+              impactLines.push(`**Details:** ${impact.reason}`);
+            }
 
             const lines = [
               '<!-- preflight-ci-report -->',
-              '## 🛫 Preflight-CI Risk Report',
+              '## Preflight-CI Risk Report',
               '',
               `**Mode:** ${report.mode || 'unknown'}`,
               `**Risk level:** ${
@@ -84,11 +135,11 @@ jobs:
               }`,
               '',
               '### API contract findings',
-                apiFindings.length
-                  ? apiFindings.map(f =>
-                      `- **${f.severity || 'REVIEW'} — ${f.type || 'Finding'}:** ${f.message || 'Details unavailable'}`
-                    ).join('\n')
-                  : '- No API breaking-change findings reported.',
+              apiFindings.length
+                ? apiFindings.map(f =>
+                    `- **${f.severity || 'REVIEW'} — ${f.type || 'Finding'}:** ${f.message || 'Details unavailable'}`
+                  ).join('\n')
+                : '- No API breaking-change findings reported.',
               '',
               '### API specifications requiring review',
               apiReviewItems.length
@@ -96,6 +147,9 @@ jobs:
                     `- **${f.type || 'Review item'}:** ${f.path || 'Unknown file'} — ${f.message || 'Manual review required'}`
                   ).join('\n')
                 : '- No additional API specification review items.',
+              '',
+              '### Downstream service impact',
+              ...impactLines,
               '',
               '### Compliance review',
               complianceFindings.length
@@ -114,7 +168,9 @@ jobs:
                   ).join('\n')
                 : '- None',
               '',
-              '_Preflight-CI findings are automated review signals, not proof of a compliance violation. Please review the evidence before merging._'
+              '_Downstream impact is estimated from configured service ownership and statically detected HTTP calls. Dynamic dependencies may be missed._',
+              '',
+              '_Preflight-CI findings are automated review signals, not proof of a compliance violation. Review the evidence before merging._'
             ];
 
             const body = lines.join('\n');
