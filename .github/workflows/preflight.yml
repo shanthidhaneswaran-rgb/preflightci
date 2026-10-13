@@ -64,6 +64,8 @@ jobs:
             const summary = report.summary || {};
             const apiFindings =
               (report.api_contract && report.api_contract.findings) || [];
+            const apiReviewItems =
+              (report.api_contract && report.api_contract.review_items) || [];
             const complianceFindings =
               report.compliance_findings || [];
             const errors = report.analysis_errors || [];
@@ -82,11 +84,18 @@ jobs:
               }`,
               '',
               '### API contract findings',
-              apiFindings.length
-                ? apiFindings.map(f =>
-                    `- **${f.severity || 'REVIEW'} — ${f.type || 'Finding'}:** ${f.message || 'Details unavailable'}`
+                apiFindings.length
+                  ? apiFindings.map(f =>
+                      `- **${f.severity || 'REVIEW'} — ${f.type || 'Finding'}:** ${f.message || 'Details unavailable'}`
+                    ).join('\n')
+                  : '- No API breaking-change findings reported.',
+              '',
+              '### API specifications requiring review',
+              apiReviewItems.length
+                ? apiReviewItems.map(f =>
+                    `- **${f.type || 'Review item'}:** ${f.path || 'Unknown file'} — ${f.message || 'Manual review required'}`
                   ).join('\n')
-                : '- No API contract findings reported.',
+                : '- No additional API specification review items.',
               '',
               '### Compliance review',
               complianceFindings.length
