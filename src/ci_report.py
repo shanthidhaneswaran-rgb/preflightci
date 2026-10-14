@@ -1,4 +1,3 @@
-
 import json
 import os
 import subprocess
@@ -9,9 +8,7 @@ from src.api_contract import analyze_contracts
 from src.compliance_rules import analyze_compliance
 from src.dependency_graph import build_dependency_graph
 from src.impact_analyzer import generate_impact_report
-from src.pr_impact_analyzer import analyze_repository_impact
 from src.service_detector import detect_service_references
-
 
 REPORT_PATH = Path("reports/preflight_report.json")
 TEST_DIR_NAMES = {"test", "tests", "__tests__", "fixtures", "samples"}
@@ -22,55 +19,37 @@ TEST_FILE_SUFFIXES = ("_test.py", ".spec.py", ".test.py")
 def git_text(*args):
     """Run a Git command and return stdout."""
     result = subprocess.run(
-        ["git", *args],
-        capture_output=True,
-        text=True,
-        check=True,
+        ["git", *args], capture_output=True, text=True, check=True
     )
     return result.stdout
 
 
 def get_pr_event():
-    """Return GitHub PR event data, or None outside PR Actions."""
+    """Return GitHub pull-request event data, or None outside PR Actions."""
     event_path = os.environ.get("GITHUB_EVENT_PATH")
-
     if not event_path or not Path(event_path).is_file():
         return None
-
     try:
         with open(event_path, "r", encoding="utf-8") as file:
             event = json.load(file)
     except (OSError, json.JSONDecodeError) as exc:
         print(f"Could not read GitHub event file: {exc}")
         return None
-
-    return (
-        event
-        if isinstance(event, dict) and event.get("pull_request")
-        else None
-    )
+    return event if isinstance(event, dict) and event.get("pull_request") else None
 
 
 def get_changed_files(base_sha, head_sha):
-    """Return changed paths with status and old/new paths for renames."""
-    output = git_text(
-        "diff", "--name-status", "-M", base_sha, head_sha
-    )
+    """Return changed paths with status and old/new path for renames."""
+    output = git_text("diff", "--name-status", "-M", base_sha, head_sha)
     changes = []
-
     for line in output.splitlines():
         fields = line.split("\t")
-
         if len(fields) < 2:
             continue
-
         status = fields[0]
-
         if status.startswith(("R", "C")) and len(fields) >= 3:
             changes.append({
-                "status": status,
-                "old_path": fields[1],
-                "new_path": fields[2],
+                "status": status, "old_path": fields[1], "new_path": fields[2]
             })
         else:
             path = fields[1]
@@ -79,7 +58,6 @@ def get_changed_files(base_sha, head_sha):
                 "old_path": None if status.startswith("A") else path,
                 "new_path": None if status.startswith("D") else path,
             })
-
     return changes
 
 
@@ -92,16 +70,12 @@ def is_openapi_file(file_path):
     """Recognize likely OpenAPI, Swagger, or AsyncAPI specification files."""
     if not file_path:
         return False
-
     name = Path(file_path).name.lower()
-
     return (
         "openapi" in name
         or "swagger" in name
         or name.startswith("asyncapi")
-        or name.endswith(
-            (".openapi.yaml", ".openapi.yml", ".openapi.json")
-        )
+        or name.endswith((".openapi.yaml", ".openapi.yml", ".openapi.json"))
     )
 
 
@@ -109,11 +83,9 @@ def is_test_or_fixture_path(file_path):
     """Return True for test, fixture, and sample paths/files."""
     if not file_path:
         return False
-
     path = Path(file_path)
     lower_parts = {part.lower() for part in path.parts}
     name = path.name.lower()
-
     return (
         bool(lower_parts & TEST_DIR_NAMES)
         or name.startswith(TEST_FILE_PREFIXES)
@@ -124,12 +96,8 @@ def is_test_or_fixture_path(file_path):
 def write_temp_file(content, original_path):
     """Write content to a temporary file while retaining its extension."""
     suffix = Path(original_path).suffix or ".txt"
-
     with tempfile.NamedTemporaryFile(
-        mode="w",
-        encoding="utf-8",
-        suffix=suffix,
-        delete=False,
+        mode="w", encoding="utf-8", suffix=suffix, delete=False
     ) as file:
         file.write(content)
         return Path(file.name)
@@ -138,29 +106,23 @@ def write_temp_file(content, original_path):
 def add_finding_file(findings, file_path):
     """Attach the source file to each finding without mutating analyzer output."""
     tagged = []
-
     for finding in findings:
         item = dict(finding)
         item["file"] = file_path
         tagged.append(item)
-
     return tagged
 
 
 def analyze_pull_request(event):
-    """Analyze API, compliance, and downstream impact for a pull request."""
+    """Analyze files changed between the pull-request base and head commits."""
     pr = event["pull_request"]
     base_sha = pr.get("base", {}).get("sha")
     head_sha = pr.get("head", {}).get("sha")
     pr_number = event.get("number")
-
     if not base_sha or not head_sha:
-        raise ValueError(
-            "Pull-request event is missing base or head SHA."
-        )
+        raise ValueError("Pull-request event is missing base or head SHA.")
 
     changes = get_changed_files(base_sha, head_sha)
-
     contract_findings = []
     compliance_findings = []
     analysis_errors = []
@@ -175,17 +137,12 @@ def analyze_pull_request(event):
         status = change["status"]
         old_path = change["old_path"]
         new_path = change["new_path"]
-
         print(
             f"[{status}] {old_path or '(new file)'}"
-            + (
-                f" -> {new_path}"
-                if new_path and new_path != old_path
-                else ""
-            )
+            + (f" -> {new_path}" if new_path and new_path != old_path else "")
         )
 
-        # Compare API specifications when both versions are available.
+        # Compare an API specification only when both versions exist.
         if is_openapi_file(old_path) or is_openapi_file(new_path):
             if not new_path:
                 spec_review_items.append({
@@ -211,6 +168,7 @@ def analyze_pull_request(event):
                 continue
 
             if not old_path:
+                # Informational only: this is not a confirmed breaking change.
                 spec_review_items.append({
                     "status": status,
                     "path": new_path,
@@ -239,22 +197,14 @@ def analyze_pull_request(event):
 
             old_temp = None
             new_temp = None
-
             try:
                 old_temp = write_temp_file(old_content, old_path)
                 new_temp = write_temp_file(new_content, new_path)
-
-                findings = analyze_contracts(
-                    str(old_temp), str(new_temp)
-                )
-                contract_findings.extend(
-                    add_finding_file(findings, new_path)
-                )
+                findings = analyze_contracts(str(old_temp), str(new_temp))
+                contract_findings.extend(add_finding_file(findings, new_path))
             except Exception as exc:
                 analysis_errors.append({
-                    "file": new_path,
-                    "analyzer": "api_contract",
-                    "error": str(exc),
+                    "file": new_path, "analyzer": "api_contract", "error": str(exc)
                 })
             finally:
                 for temp_file in (old_temp, new_temp):
@@ -266,84 +216,37 @@ def analyze_pull_request(event):
             if is_test_or_fixture_path(new_path):
                 skipped_test_python_files.append(new_path)
                 continue
-
-            temp_file = None
-
             try:
                 content = read_commit_file(head_sha, new_path)
                 temp_file = write_temp_file(content, new_path)
-                findings = analyze_compliance(str(temp_file))
-                compliance_findings.extend(
-                    add_finding_file(findings, new_path)
-                )
+                try:
+                    findings = analyze_compliance(str(temp_file))
+                    compliance_findings.extend(
+                        add_finding_file(findings, new_path)
+                    )
+                finally:
+                    temp_file.unlink(missing_ok=True)
             except Exception as exc:
                 analysis_errors.append({
-                    "file": new_path,
-                    "analyzer": "compliance",
-                    "error": str(exc),
+                    "file": new_path, "analyzer": "compliance", "error": str(exc)
                 })
-            finally:
-                if temp_file:
-                    temp_file.unlink(missing_ok=True)
-
-    # Connect changed PR paths to the configured service map.
-    changed_paths = [
-        change.get("new_path") or change.get("old_path")
-        for change in changes
-        if change.get("new_path") or change.get("old_path")
-    ]
-
-    try:
-        downstream_impact = analyze_repository_impact(changed_paths)
-    except Exception as exc:
-        downstream_impact = {
-            "status": "unknown",
-            "reason": (
-                "Downstream impact analysis could not be completed. "
-                "Manual review is recommended."
-            ),
-            "changed_services": [],
-            "affected_services": [],
-            "unresolved_changed_paths": changed_paths,
-            "scanned_files": [],
-            "dependency_edges": [],
-            "scan_errors": [],
-        }
-
-        analysis_errors.append({
-            "analyzer": "downstream_impact",
-            "error": str(exc),
-        })
-
-    affected_consumers = sum(
-        len(item.get("affected_consumers", []))
-        for item in downstream_impact.get("affected_services", [])
-    )
 
     summary = {
         "changed_files": len(changes),
         "contract_findings": len(contract_findings),
         "compliance_findings": len(compliance_findings),
         "api_spec_review_items": len(spec_review_items),
-        "downstream_impact_status": downstream_impact["status"],
-        "affected_consumers": affected_consumers,
         "analysis_errors": len(analysis_errors),
         "human_review_required": bool(
-            contract_findings
-            or compliance_findings
-            or spec_review_items
-            or analysis_errors
-            or affected_consumers
+            contract_findings or compliance_findings
+            or spec_review_items or analysis_errors
         ),
     }
-
     return {
         "project": "Preflight-CI",
         "mode": "github_pull_request",
         "pull_request": {
-            "number": pr_number,
-            "base_sha": base_sha,
-            "head_sha": head_sha,
+            "number": pr_number, "base_sha": base_sha, "head_sha": head_sha
         },
         "changed_files": changes,
         "api_contract": {
@@ -352,23 +255,22 @@ def analyze_pull_request(event):
         },
         "compliance_findings": compliance_findings,
         "skipped_test_python_files": skipped_test_python_files,
-        "downstream_impact": downstream_impact,
+        "downstream_impact": {
+            "status": "not_analyzed",
+            "reason": (
+                "Real-PR service ownership and dependency mapping are not yet "
+                "connected. The local demo still shows the sample graph."
+            ),
+        },
         "analysis_errors": analysis_errors,
         "summary": summary,
         "limitations": [
-            (
-                "Compliance scans inspect full changed production Python "
-                "files, so findings may predate the PR."
-            ),
-            (
-                "New API specifications are informational because no prior "
-                "version exists at the same path for comparison."
-            ),
+            "Compliance scans inspect full changed production Python files, so "
+            "findings may predate the PR.",
+            "New API specifications are informational because no prior version "
+            "exists at the same path for comparison.",
             "Deleted API specifications are flagged for manual review.",
-            (
-                "Downstream impact uses configured service ownership and "
-                "statically detected HTTP calls; dynamic dependencies may be missed."
-            ),
+            "Downstream impact is not yet calculated from real PR changes.",
             "Compliance findings are review signals, not confirmed violations.",
         ],
     }
@@ -382,25 +284,15 @@ def analyze_local_demo():
     dependency_file = "tests/sample_banking_services.py"
     changed_service = "fraud-service.internal"
 
-    for filename in (
-        old_spec,
-        new_spec,
-        compliance_file,
-        dependency_file,
-    ):
+    for filename in (old_spec, new_spec, compliance_file, dependency_file):
         if not Path(filename).is_file():
-            raise FileNotFoundError(
-                f"Required demo input not found: {filename}"
-            )
+            raise FileNotFoundError(f"Required demo input not found: {filename}")
 
     contract_findings = analyze_contracts(old_spec, new_spec)
     references = detect_service_references(dependency_file)
     graph = build_dependency_graph("payment-service", references)
-
     impact = generate_impact_report(
-        changed_service=changed_service,
-        findings=contract_findings,
-        graph=graph,
+        changed_service=changed_service, findings=contract_findings, graph=graph
     )
     compliance_findings = analyze_compliance(compliance_file)
 
@@ -433,7 +325,6 @@ def analyze_local_demo():
 
 def main():
     event = get_pr_event()
-
     if event:
         report = analyze_pull_request(event)
     else:
@@ -441,11 +332,7 @@ def main():
         report = analyze_local_demo()
 
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    REPORT_PATH.write_text(
-        json.dumps(report, indent=2),
-        encoding="utf-8",
-    )
-
+    REPORT_PATH.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print("\nPreflight-CI Report")
     print("=" * 35)
     print(json.dumps(report["summary"], indent=2))
