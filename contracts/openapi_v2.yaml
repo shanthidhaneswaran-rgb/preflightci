@@ -1,0 +1,37 @@
+
+openapi: 3.0.3
+
+info:
+  title: Preflight-CI Payment API
+  version: 2.0.0
+
+paths:
+  /payments:
+    post:
+      summary: Process a payment
+      operationId: processPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - transaction_id
+                - amount
+              properties:
+                transaction_id:
+                  type: string
+                amount:
+                  type: number
+      responses:
+        "200":
+          description: Payment processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+# Final demo trigger 
