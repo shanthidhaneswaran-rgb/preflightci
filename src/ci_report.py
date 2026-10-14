@@ -192,18 +192,22 @@ def find_baseline_spec(base_sha, candidate_path, head_sha=None):
     if not siblings:
         return None
 
-    # Prefer conventional baseline filenames over versioned candidates.
+    # Do not treat a conventional baseline file as a candidate to compare.
+    candidate_name = candidate.name.lower()
     preferred_names = (
         "openapi.yaml", "openapi.yml", "openapi.json",
         "swagger.yaml", "swagger.yml", "swagger.json",
     )
+    if candidate_name in preferred_names:
+        return None
+
+    # Prefer conventional baseline filenames over versioned candidates.
     for name in preferred_names:
         for path in siblings:
             if Path(path).name.lower() == name:
                 return path
 
-    # If there is only one sibling spec at the base commit, it is an
-    # unambiguous baseline. Avoid guessing when multiple candidates exist.
+    # If there is only one sibling spec, use it as the baseline.
     return siblings[0] if len(siblings) == 1 else None
 
 
