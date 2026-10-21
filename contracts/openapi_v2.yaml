@@ -32,7 +32,7 @@ paths:
               schema:
                 type: object
                 properties:
-                  transactionid:
+                  transaction_id:
                     type: string
                   status:
                     type: string
