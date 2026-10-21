@@ -22,8 +22,7 @@ paths:
               properties:
                 transaction_id:
                   type: string
-                amount:
-                  type: number
+               
       responses:
         "200":
           description: Payment processed successfully
@@ -36,4 +35,4 @@ paths:
                     type: string
                   status:
                     type: string
-# Final demo trigger 
+
