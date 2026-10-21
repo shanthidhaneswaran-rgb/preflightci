@@ -32,6 +32,8 @@ paths:
               schema:
                 type: object
                 properties:
+                  transaction_id:
+                    type: string
                   status:
                     type: string
 # Final demo trigger 

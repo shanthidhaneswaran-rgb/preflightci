@@ -2,7 +2,6 @@
 import json
 import urllib.error
 import urllib.request
-
 from src.retrieve_policies import retrieve_policies
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
