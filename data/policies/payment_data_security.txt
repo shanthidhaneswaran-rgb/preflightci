@@ -1,0 +1,16 @@
+Policy ID: SAMPLE-SEC-001
+Title: Payment Data Security
+Source: Preflight-CI demonstration policy
+Status: Illustrative project policy — not an official regulatory standard
+
+Rule 1: Sensitive payment data must be handled carefully.
+Applications should identify sensitive payment data, including payment card numbers and account identifiers, and apply appropriate protection measures.
+
+Rule 2: Sensitive data should not be exposed in application logs.
+Logging statements should avoid writing full payment card numbers, passwords, access tokens, or other sensitive values. Use masking or redaction where appropriate.
+
+Rule 3: Data storage requires a security review.
+Before storing sensitive payment information, developers should review the purpose of storage, access restrictions, retention requirements, and applicable protection measures.
+
+Rule 4: Findings require evidence.
+A code review finding should identify the relevant file, line, code evidence, and reason for review. A potential issue must not automatically be described as a confirmed regulatory violation.

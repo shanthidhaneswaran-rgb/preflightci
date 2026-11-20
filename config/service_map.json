@@ -1,0 +1,37 @@
+{
+  "services": [
+    {
+      "name": "payment-service",
+      "specs": [
+        "contracts/openapi.yaml",
+        "contracts/openapi_v2.yaml"
+      ],
+      "source_paths": [
+        "services/payment/"
+      ],
+      "hosts": [
+        "payment-service.internal"
+      ]
+    },
+    {
+      "name": "fraud-service",
+      "specs": [],
+      "source_paths": [
+        "services/fraud/"
+      ],
+      "hosts": [
+        "fraud-service.internal"
+      ]
+    },
+    {
+      "name": "customer-service",
+      "specs": [],
+      "source_paths": [
+        "services/customer/"
+      ],
+      "hosts": [
+        "customer-service.internal"
+      ]
+    }
+  ]
+}
