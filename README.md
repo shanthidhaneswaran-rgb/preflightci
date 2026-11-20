@@ -14,7 +14,7 @@ Under Development
 
 \## Team Members
 
-\- Shanthidhaneswaran
+\-Dhaneswaran
 
 \-Dharanidhara
 
