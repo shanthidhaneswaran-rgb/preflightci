@@ -22,5 +22,5 @@ Under Development
 
 \-AshmithaTamilmaran
 
-\-AshvinyGanesan
+\-Ashviny
 
